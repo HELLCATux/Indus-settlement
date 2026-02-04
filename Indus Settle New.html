@@ -1,0 +1,823 @@
+<!doctype html>
+<html class="h-full">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>@Pruthvi@ Indusind Tc settlement</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="/_sdk/element_sdk.js"></script>
+  <style>
+        body {
+            box-sizing: border-box;
+        }
+        [contenteditable]:focus {
+            outline: 2px solid #3b82f6;
+            outline-offset: -2px;
+            background: #eff6ff;
+        }
+    </style>
+  <style>@view-transition { navigation: auto; }</style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+ </head>
+ <body class="h-full bg-slate-50 text-slate-800 font-sans">
+  <div class="h-full overflow-auto p-6"><!-- Header -->
+   <div class="mb-6">
+    <h1 id="pageTitle" class="text-2xl font-bold text-slate-900 mb-2">@Pruthvi@ Indusind Tc settlement</h1>
+    <p class="text-slate-600">Paste your Excel data to reconcile bank and EON transactions</p>
+   </div><!-- Tab Buttons -->
+   <div class="flex gap-3 mb-6"><button id="bankBtn" onclick="showSection('bank')" class="px-5 py-2.5 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-colors shadow-sm"> 📊 Bank Excel </button> <button id="eonBtn" onclick="showSection('eon')" class="px-5 py-2.5 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition-colors shadow-sm"> 📈 EON Excel </button> <button onclick="clearAll()" class="px-5 py-2.5 bg-slate-200 text-slate-700 rounded-lg font-medium hover:bg-slate-300 transition-colors"> 🔄 Clear All </button>
+   </div><!-- Bank Section -->
+   <div id="bankSection" class="hidden mb-6 bg-white rounded-lg p-3 shadow-sm border border-slate-200 max-w-2xl">
+    <h3 class="text-sm font-semibold text-slate-800 mb-1.5">Paste Bank Excel Data</h3>
+    <p class="text-xs text-slate-500 mb-2"><span class="font-medium">Required headers:</span> CURRCODE, AMOUNT, INRAMOUNT, TOTALINRAMT, COMMISSION, GST, NOSTRO OUR CHARGES</p><textarea id="bankData" placeholder="Select and copy Excel cells, then paste here (Ctrl+V / Cmd+V)" class="w-full h-12 p-2 border border-slate-300 rounded-lg font-mono text-xs resize-y focus:ring-2 focus:ring-blue-500 focus:border-blue-500" onkeydown="handleEnterKey(event, 'eonData')"></textarea> <button onclick="processBank()" class="mt-2 px-4 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors"> ✓ Process Bank Data </button>
+   </div><!-- EON Section -->
+   <div id="eonSection" class="hidden mb-6 bg-white rounded-lg p-3 shadow-sm border border-slate-200 max-w-2xl">
+    <h3 class="text-sm font-semibold text-slate-800 mb-1.5">Paste EON Excel Data</h3>
+    <p class="text-xs text-slate-500 mb-2"><span class="font-medium">Required headers:</span> AMOUNT or TOTAL (will auto-detect INR total)</p><textarea id="eonData" placeholder="Select and copy Excel cells, then paste here (Ctrl+V / Cmd+V)" class="w-full h-12 p-2 border border-slate-300 rounded-lg font-mono text-xs resize-y focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"></textarea> <button onclick="processEON()" class="mt-2 px-4 py-1.5 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700 transition-colors"> ✓ Process EON Data </button>
+   </div><!-- Summary Section -->
+   <div class="bg-white rounded-xl p-5 shadow-sm border border-slate-200">
+    <h3 class="text-lg font-semibold text-slate-800 mb-4">     Summary</h3>
+    <div class="flex flex-wrap gap-6"><!-- Currency Summary Table -->
+     <div class="w-96">
+      <h4 class="text-sm font-medium text-slate-600 mb-2">Currency Breakdown</h4>
+      <div class="overflow-x-auto rounded-lg border border-slate-200">
+       <table class="w-full text-sm">
+        <thead>
+         <tr class="bg-slate-100">
+          <th class="px-3 py-2 text-left font-semibold text-slate-700 border-b text-xs">FCN CODE</th>
+          <th class="px-3 py-2 text-right font-semibold text-slate-700 border-b text-xs">FCN TOTAL</th>
+          <th class="px-3 py-2 text-right font-semibold text-slate-700 border-b text-xs">INR AMOUNT</th>
+          <th class="px-3 py-2 text-right font-semibold text-slate-700 border-b text-xs">FCN AVG RATE</th>
+         </tr>
+        </thead>
+        <tbody id="resultTableBody">
+         <tr>
+          <td colspan="4" class="px-4 py-6 text-center text-slate-400 italic">No data processed yet</td>
+         </tr>
+        </tbody>
+       </table>
+      </div>
+     </div><!-- Calculation Table -->
+     <div class="w-80">
+      <h4 class="text-sm font-medium text-slate-600 mb-2">Reconciliation</h4>
+      <div class="rounded-lg border border-slate-200 overflow-hidden">
+       <table class="w-full text-sm">
+        <tbody>
+         <tr class="bg-slate-50 h-8">
+          <td class="px-3 py-1.5 font-medium text-slate-700 text-xs">FCN Amount (INR)</td>
+          <td class="px-3 py-1.5 text-right font-mono text-xs" id="rightInr">0.00</td>
+         </tr>
+         <tr class="h-8">
+          <td class="px-3 py-1.5 font-medium text-slate-700 text-xs">BC Charges</td>
+          <td class="px-3 py-1.5 text-right font-mono text-xs" id="rightBc">0.00</td>
+         </tr>
+         <tr class="bg-blue-50 border-t-2 border-blue-200 h-8">
+          <td class="px-3 py-1.5 font-semibold text-blue-800 text-xs">Total Debit Advice (A)</td>
+          <td class="px-3 py-1.5 text-right font-mono font-semibold text-blue-800 text-xs" id="rightTotal">0.00</td>
+         </tr>
+         <tr class="border-t h-8">
+          <td class="px-3 py-1.5 font-medium text-slate-700 text-xs">DELCAN Charges (B)</td>
+          <td class="px-3 py-1.5 text-right font-mono text-slate-900 cursor-text text-xs" contenteditable="true" id="rightDelcan" oninput="recalcDiff()" onkeydown="handleEditableCellEnter(event, 'rightEon')">0.00</td>
+         </tr>
+         <tr class="bg-emerald-50 h-8">
+          <td class="px-3 py-1.5 font-semibold text-emerald-800 text-xs">EON AMOUNT (C)</td>
+          <td class="px-3 py-1.5 text-right font-mono font-semibold text-emerald-800 cursor-text text-xs" contenteditable="true" id="rightEon" oninput="recalcDiff()" onkeydown="handleEditableCellEnter(event, null)">0.00</td>
+         </tr>
+         <tr class="border-t-2 border-slate-300 h-8">
+          <td class="px-3 py-1.5 font-bold text-slate-900 text-xs">Difference (D)</td>
+          <td class="px-3 py-1.5 text-right font-mono font-bold text-sm" id="rightDiff">0.00</td>
+         </tr>
+        </tbody>
+       </table>
+      </div>
+      <p class="text-xs text-slate-500 mt-2 italic">Formula: D = A + B - C</p>
+      <p class="text-xs text-slate-400 mt-1">Click yellow/green cells to edit values</p>
+     </div><!-- Client Reference Table -->
+     <div class="w-80">
+      <div class="flex items-center justify-between mb-2">
+       <h4 class="text-sm font-medium text-slate-600">Client References</h4><button onclick="copyClientReferences()" class="px-3 py-1.5 bg-blue-600 text-white text-xs rounded-md font-medium hover:bg-blue-700 transition-colors"> 📋 Copy </button>
+      </div>
+      <div class="rounded-lg border border-slate-200 overflow-hidden max-h-96 overflow-y-auto">
+       <table class="w-full text-sm">
+        <thead class="sticky top-0 bg-slate-100">
+         <tr>
+          <th class="px-3 py-2 text-left font-semibold text-slate-700 border-b text-xs">CLIENT REFERENCE</th>
+         </tr>
+        </thead>
+        <tbody id="clientRefTableBody">
+         <tr>
+          <td class="px-4 py-6 text-center text-slate-400 italic">No data processed yet</td>
+         </tr>
+        </tbody>
+       </table>
+      </div>
+     </div><!-- Unmatched Report Table -->
+     <div class="w-80">
+      <div class="flex items-center justify-between mb-2">
+       <h4 class="text-sm font-medium text-slate-600">Unmatched Report</h4><button onclick="copyUnmatchedReport()" class="px-3 py-1.5 bg-red-600 text-white text-xs rounded-md font-medium hover:bg-red-700 transition-colors"> 📋 Copy </button>
+      </div>
+      <div class="rounded-lg border border-slate-200 overflow-hidden max-h-96 overflow-y-auto">
+       <table class="w-full text-sm">
+        <thead class="sticky top-0 bg-slate-100">
+         <tr id="unmatchedOutputHeader">
+          <th class="px-4 py-3 text-center font-semibold text-slate-700 border-b" colspan="10">No unmatched data yet</th>
+         </tr>
+        </thead>
+        <tbody id="unmatchedOutputTableBody">
+         <tr>
+          <td class="px-4 py-6 text-center text-slate-400 italic">Process EON data to see unmatched rows</td>
+         </tr>
+        </tbody>
+       </table>
+      </div>
+     </div><!-- EON Output Table -->
+     <div class="flex-1 min-w-[500px]">
+      <div class="flex items-center justify-between mb-2">
+       <h4 class="text-sm font-medium text-slate-600">EON Filtered Output</h4><button onclick="copyEonOutput()" class="px-3 py-1.5 bg-emerald-600 text-white text-xs rounded-md font-medium hover:bg-emerald-700 transition-colors"> 📋 Copy </button>
+      </div>
+      <div class="rounded-lg border border-slate-200 overflow-hidden max-h-96 overflow-y-auto">
+       <table class="w-full text-sm">
+        <thead class="sticky top-0 bg-slate-100">
+         <tr id="eonOutputHeader">
+          <th class="px-4 py-3 text-center font-semibold text-slate-700 border-b" colspan="10">No EON data processed yet</th>
+         </tr>
+        </thead>
+        <tbody id="eonOutputTableBody">
+         <tr>
+          <td class="px-4 py-6 text-center text-slate-400 italic">Process EON data to see filtered output</td>
+         </tr>
+        </tbody>
+       </table>
+      </div>
+     </div>
+    </div>
+   </div><!-- Status Message -->
+   <div id="statusMsg" class="hidden mt-4 p-3 rounded-lg text-sm font-medium"></div>
+  </div>
+  <script>
+        // Configuration
+        const defaultConfig = {
+            page_title: "@Pruthvi@ Indusind Tc settlement"
+        };
+
+        let config = { ...defaultConfig };
+
+        // Initialize Element SDK
+        if (window.elementSdk) {
+            window.elementSdk.init({
+                defaultConfig,
+                onConfigChange: async (newConfig) => {
+                    config = { ...defaultConfig, ...newConfig };
+                    document.getElementById('pageTitle').textContent = config.page_title || defaultConfig.page_title;
+                },
+                mapToCapabilities: () => ({
+                    recolorables: [],
+                    borderables: [],
+                    fontEditable: undefined,
+                    fontSizeable: undefined
+                }),
+                mapToEditPanelValues: (cfg) => new Map([
+                    ["page_title", cfg.page_title || defaultConfig.page_title]
+                ])
+            });
+        }
+
+        // Handle Enter key to move to next field
+        function handleEnterKey(event, nextFieldId) {
+            if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault();
+                const nextField = document.getElementById(nextFieldId);
+                if (nextField) {
+                    nextField.focus();
+                }
+            }
+        }
+
+        // Handle Enter key in editable cells to move to next cell
+        function handleEditableCellEnter(event, nextFieldId) {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                if (nextFieldId) {
+                    const nextField = document.getElementById(nextFieldId);
+                    if (nextField) {
+                        nextField.focus();
+                        // Select all text in the next field for easy editing
+                        const range = document.createRange();
+                        range.selectNodeContents(nextField);
+                        const sel = window.getSelection();
+                        sel.removeAllRanges();
+                        sel.addRange(range);
+                    }
+                }
+            }
+        }
+
+        // Show/hide sections
+        function showSection(section) {
+            document.getElementById('bankSection').classList.toggle('hidden', section !== 'bank');
+            document.getElementById('eonSection').classList.toggle('hidden', section !== 'eon');
+        }
+
+        // Utility functions
+        function norm(h) {
+            return h.replace(/\s+/g, '').toUpperCase();
+        }
+
+        function num(v) {
+            if (typeof v === 'number') return v;
+            return parseFloat((v || '').toString().replace(/,/g, '')) || 0;
+        }
+
+        function fmt(n) {
+            return n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function showStatus(msg, type) {
+            const el = document.getElementById('statusMsg');
+            el.textContent = msg;
+            el.className = 'mt-4 p-3 rounded-lg text-sm font-medium ' + 
+                (type === 'success' ? 'bg-green-100 text-green-800' : 
+                 type === 'error' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800');
+            el.classList.remove('hidden');
+            setTimeout(() => el.classList.add('hidden'), 4000);
+        }
+
+        // Recalculate difference
+        function recalcDiff() {
+            const A = num(document.getElementById('rightTotal').innerText);
+            const B = num(document.getElementById('rightDelcan').innerText);
+            const C = num(document.getElementById('rightEon').innerText);
+            const D = A + B - C;
+            
+            const diffEl = document.getElementById('rightDiff');
+            diffEl.innerText = fmt(D);
+            
+            // Color code the difference
+            if (Math.abs(D) < 1) {
+                diffEl.className = 'px-3 py-2 text-right font-mono font-bold text-sm text-green-600';
+            } else if (D > 0) {
+                diffEl.className = 'px-3 py-2 text-right font-mono font-bold text-sm text-orange-600';
+            } else {
+                diffEl.className = 'px-3 py-2 text-right font-mono font-bold text-sm text-red-600';
+            }
+        }
+
+        // Process Bank Data
+        function processBank() {
+            const text = document.getElementById("bankData").value.trim();
+            if (!text) {
+                showStatus("Please paste Excel data first", "error");
+                return;
+            }
+
+            const rows = text.split("\n").map(r => r.split("\t"));
+            if (rows.length < 2) {
+                showStatus("Data must have headers and at least one row", "error");
+                return;
+            }
+
+            const headers = rows[0].map(h => norm(h));
+
+            const idxCurr = headers.indexOf('CURRCODE');
+            const idxAmt = headers.indexOf('AMOUNT');
+            const idxInr = headers.indexOf('INRAMOUNT');
+            const idxTotal = headers.indexOf('TOTALINRAMT');
+            const idxComm = headers.findIndex(h => h.includes('COMMISSION') || h.includes('COMMISSIOIN'));
+            const idxGst = headers.indexOf('GST');
+            const idxNostro = headers.findIndex(h => h.includes('NOSTRO'));
+            const idxClientRef = headers.indexOf('CLIENTREFERENCE');
+
+            if (idxCurr === -1 || idxAmt === -1) {
+                showStatus("Required columns CURRCODE and AMOUNT not found", "error");
+                return;
+            }
+
+            // Aggregate by currency
+            const summary = {};
+            const clientReferences = [];
+            let totalInr = 0, totalBc = 0, grandTotal = 0;
+
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i];
+                if (row.length <= idxCurr) continue;
+
+                let curr = (row[idxCurr] || '').trim().toUpperCase();
+                if (!curr) continue;
+                
+                // Remove /INR suffix and keep only 3-digit currency code
+                curr = curr.split('/')[0].substring(0, 3);
+
+                const amt = num(row[idxAmt]);
+                const inr = idxInr !== -1 ? num(row[idxInr]) : 0;
+                const total = idxTotal !== -1 ? num(row[idxTotal]) : inr;
+                const comm = idxComm !== -1 ? num(row[idxComm]) : 0;
+                const gst = idxGst !== -1 ? num(row[idxGst]) : 0;
+                const nostro = idxNostro !== -1 ? num(row[idxNostro]) : 0;
+
+                if (!summary[curr]) {
+                    summary[curr] = { amount: 0, inr: 0, total: 0 };
+                }
+
+                summary[curr].amount += amt;
+                summary[curr].inr += inr;
+                summary[curr].total += total;
+
+                totalInr += inr;
+                totalBc += (comm + gst + nostro);
+                grandTotal += total;
+
+                // Collect client reference if available
+                if (idxClientRef !== -1) {
+                    const clientRef = (row[idxClientRef] || '').trim();
+                    if (clientRef) {
+                        clientReferences.push(clientRef);
+                    }
+                }
+            }
+
+            // Render summary table
+            const tbody = document.getElementById('resultTableBody');
+            tbody.innerHTML = '';
+
+            const currencies = Object.keys(summary).sort();
+            if (currencies.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="px-4 py-6 text-center text-slate-400 italic">No valid data found</td></tr>';
+                showStatus("No valid currency data found", "error");
+                return;
+            }
+
+            // Clear and populate currencyRates
+            currencyRates = {};
+
+            currencies.forEach(curr => {
+                const d = summary[curr];
+                let avgRate = d.amount !== 0 ? (d.inr / d.amount) : 0;
+                // Multiply JPY rate by 100 for better readability
+                if (curr === 'JPY') {
+                    avgRate = avgRate * 100;
+                }
+                
+                // Store the rate in currencyRates global object
+                currencyRates[curr] = avgRate;
+                
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-slate-100 hover:bg-slate-50';
+                tr.innerHTML = `
+                    <td class="px-3 py-1.5 font-medium text-slate-800 text-xs">${curr}</td>
+                    <td class="px-3 py-1.5 text-right font-mono text-xs">${fmt(d.amount)}</td>
+                    <td class="px-3 py-1.5 text-right font-mono text-xs">${fmt(d.inr)}</td>
+                    <td class="px-3 py-1.5 text-right font-mono text-slate-600 text-xs">${avgRate.toFixed(4)}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+
+            // Add totals row
+            const totalRow = document.createElement('tr');
+            totalRow.className = 'bg-slate-100 font-semibold';
+            totalRow.innerHTML = `
+                <td class="px-3 py-1.5 text-slate-800 text-xs">TOTAL</td>
+                <td class="px-3 py-1.5 text-right font-mono text-xs">-</td>
+                <td class="px-3 py-1.5 text-right font-mono text-xs">${fmt(totalInr)}</td>
+                <td class="px-3 py-1.5 text-right font-mono text-xs">-</td>
+            `;
+            tbody.appendChild(totalRow);
+
+            // Update right side
+            document.getElementById('rightInr').innerText = fmt(totalInr);
+            document.getElementById('rightBc').innerText = fmt(totalBc);
+            document.getElementById('rightTotal').innerText = fmt(grandTotal);
+
+            // Render client references (filter out NIUM and FRM)
+            const clientRefTbody = document.getElementById('clientRefTableBody');
+            clientRefTbody.innerHTML = '';
+
+            if (clientReferences.length === 0) {
+                clientRefTbody.innerHTML = '<tr><td class="px-4 py-6 text-center text-slate-400 italic">No client references found</td></tr>';
+            } else {
+                clientReferences.forEach(ref => {
+                    // Remove "NIUM" and "FRM" from the reference
+                    let filteredRef = ref.replace(/NIUM/gi, '').replace(/FRM/gi, '').trim();
+                    if (filteredRef) {
+                        const tr = document.createElement('tr');
+                        tr.className = 'border-b border-slate-100';
+                        tr.innerHTML = `<td class="px-3 py-1.5 text-slate-700 text-xs">${filteredRef}</td>`;
+                        clientRefTbody.appendChild(tr);
+                    }
+                });
+            }
+
+            recalcDiff();
+            showStatus(`Processed ${currencies.length} currencies, ${rows.length - 1} transactions`, "success");
+        }
+
+        // Process EON Data
+        function processEON() {
+            const text = document.getElementById("eonData").value.trim();
+            if (!text) {
+                showStatus("Please paste EON Excel data first", "error");
+                return;
+            }
+
+            const rows = text.split("\n").map(r => r.split("\t"));
+            if (rows.length < 2) {
+                showStatus("Data must have headers and at least one row", "error");
+                return;
+            }
+
+            const headers = rows[0].map(h => norm(h));
+            console.log("EON Headers:", headers);
+
+            // Find required columns
+            let idxAmt = headers.findIndex(h => h.includes('AMOUNT') || h.includes('TOTAL') || h.includes('INR'));
+            const idxBranch = headers.indexOf('BRANCH');
+            const idxCardNo = headers.indexOf('CARDNO');
+            const idxSettRate = headers.indexOf('SETTRATE');
+            const idxCurrCode = headers.indexOf('CURRCODE');
+            const idxFcyName = headers.indexOf('FCYNAME');
+            
+            console.log("Column indices - Amount:", idxAmt, "Branch:", idxBranch, "CardNo:", idxCardNo, "SettRate:", idxSettRate, "CurrCode:", idxCurrCode, "FcyName:", idxFcyName);
+            
+            if (idxAmt === -1) {
+                // Try to find any numeric column
+                for (let i = 0; i < headers.length; i++) {
+                    if (rows.length > 1 && !isNaN(num(rows[1][i])) && num(rows[1][i]) > 0) {
+                        idxAmt = i;
+                        break;
+                    }
+                }
+            }
+
+            if (idxAmt === -1) {
+                showStatus("Could not find amount column in EON data", "error");
+                return;
+            }
+
+            // Get client references from the displayed Client References table
+            const clientRefTbody = document.getElementById('clientRefTableBody');
+            const clientRefRows = clientRefTbody.querySelectorAll('tr');
+            const clientReferences = [];
+            clientRefRows.forEach(row => {
+                const cell = row.querySelector('td');
+                const text = cell.textContent.trim();
+                // Only get actual client reference values (skip placeholder text)
+                if (text && !text.includes('No data') && !text.includes('No client')) {
+                    clientReferences.push(text);
+                }
+            });
+            
+            console.log("Client References found:", clientReferences.length, clientReferences);
+
+            // Filter EON rows based on BRANCH and CARD NO matching with CLIENTREFERENCE
+            const validRows = [rows[0]]; // Keep headers
+            const unmatchedRows = [rows[0]]; // Keep headers for unmatched
+            let totalEon = 0;
+            let matchedCount = 0;
+            let removedCount = 0;
+
+            for (let i = 1; i < rows.length; i++) {
+                const row = [...rows[i]]; // Create a copy to avoid reference issues
+                let isValid = false; // Default to false - only include if match found
+
+                // Check if BRANCH and CARD NO columns exist
+                if (idxBranch !== -1 && idxCardNo !== -1 && clientReferences.length > 0) {
+                    const branch = (row[idxBranch] || '').trim().toUpperCase();
+                    const cardNo = (row[idxCardNo] || '').trim();
+                    
+                    // Take first 7 digits of CARD NO
+                    const first7Digits = cardNo.substring(0, 7);
+                    
+                    // Construct the search pattern: BRANCH + first 7 digits of CARD NO
+                    const searchPattern = branch + first7Digits;
+                    
+                    console.log(`\n=== Row ${i} ===`);
+                    console.log(`Branch: "${branch}"`);
+                    console.log(`Card No: "${cardNo}"`);
+                    console.log(`First 7 Digits: "${first7Digits}"`);
+                    console.log(`Search Pattern: "${searchPattern}"`);
+                    console.log(`Checking against ${clientReferences.length} client references...`);
+                    
+                    // Check if any client reference contains the exact pattern
+                    let matchFound = false;
+                    for (let j = 0; j < clientReferences.length; j++) {
+                        const ref = clientReferences[j].toUpperCase();
+                        if (ref.includes(searchPattern)) {
+                            console.log(`  ✓ MATCH FOUND! Pattern "${searchPattern}" found in reference: "${clientReferences[j]}"`);
+                            matchFound = true;
+                            break;
+                        }
+                    }
+                    
+                    if (matchFound) {
+                        isValid = true;
+                        
+                        // Replace Sett Rate with AVG RATE from currencyRates (4 decimals)
+                        // Check both CURRCODE and FCY NAME columns
+                        if (idxSettRate !== -1) {
+                            let currCode = '';
+                            
+                            // Try CURRCODE first
+                            if (idxCurrCode !== -1) {
+                                currCode = (row[idxCurrCode] || '').trim().toUpperCase();
+                                currCode = currCode.split('/')[0].substring(0, 3);
+                            }
+                            
+                            // If no CURRCODE or not found, try FCY NAME
+                            if ((!currCode || !currencyRates[currCode]) && idxFcyName !== -1) {
+                                currCode = (row[idxFcyName] || '').trim().toUpperCase();
+                                currCode = currCode.split('/')[0].substring(0, 3);
+                            }
+                            
+                            if (currCode && currencyRates[currCode]) {
+                                row[idxSettRate] = currencyRates[currCode].toFixed(4);
+                                console.log(`  Replaced Sett Rate for ${currCode}: ${row[idxSettRate]}`);
+                            }
+                        }
+                        
+                        validRows.push(row);
+                        totalEon += num(row[idxAmt]);
+                        matchedCount++;
+                        console.log(`✓ Row ${i} INCLUDED in output\n`);
+                    } else {
+                        console.log(`❌ No match found for pattern "${searchPattern}"`);
+                        console.log(`✗ Row ${i} EXCLUDED from output - Adding to Unmatched Report\n`);
+                        unmatchedRows.push(row);
+                        removedCount++;
+                    }
+                } else {
+                    // If no client references or missing columns, include all rows
+                    console.log(`Row ${i}: No filtering (missing columns or references)`);
+                    
+                    // Replace Sett Rate with AVG RATE from currencyRates
+                    // Check both CURRCODE and FCY NAME columns
+                    if (idxSettRate !== -1) {
+                        let currCode = '';
+                        
+                        // Try CURRCODE first
+                        if (idxCurrCode !== -1) {
+                            currCode = (row[idxCurrCode] || '').trim().toUpperCase();
+                            currCode = currCode.split('/')[0].substring(0, 3);
+                        }
+                        
+                        // If no CURRCODE or not found, try FCY NAME
+                        if ((!currCode || !currencyRates[currCode]) && idxFcyName !== -1) {
+                            currCode = (row[idxFcyName] || '').trim().toUpperCase();
+                            currCode = currCode.split('/')[0].substring(0, 3);
+                        }
+                        
+                        if (currCode && currencyRates[currCode]) {
+                            row[idxSettRate] = currencyRates[currCode].toFixed(4);
+                            console.log(`  Replaced Sett Rate for ${currCode}: ${row[idxSettRate]}`);
+                        }
+                    }
+                    
+                    validRows.push(row);
+                    totalEon += num(row[idxAmt]);
+                    matchedCount++;
+                }
+            }
+
+            console.log("Valid rows to display:", validRows.length, validRows);
+            console.log("Unmatched rows:", unmatchedRows.length, unmatchedRows);
+
+            // Display the filtered output in EON textarea
+            const filteredOutput = validRows.map(row => row.join('\t')).join('\n');
+            document.getElementById('eonData').value = filteredOutput;
+
+            // Display EON output in table
+            displayEonOutput(validRows);
+
+            // Display unmatched output in table
+            displayUnmatchedOutput(unmatchedRows);
+
+            // Don't auto-fill EON AMOUNT - let user enter it manually
+            // document.getElementById('rightEon').innerText = fmt(totalEon);
+            recalcDiff();
+            
+            if (removedCount > 0) {
+                showStatus(`Filtered EON data: ${matchedCount} matched rows (${removedCount} rows removed). Enter EON Amount manually.`, "success");
+            } else {
+                showStatus(`Filtered EON data: ${matchedCount} rows. Enter EON Amount manually.`, "success");
+            }
+        }
+
+        // Global variable to store currency rates
+        let currencyRates = {};
+
+        // Display EON output in table
+        function displayEonOutput(rows) {
+            const headerRow = document.getElementById('eonOutputHeader');
+            const tbody = document.getElementById('eonOutputTableBody');
+            
+            if (rows.length < 2) {
+                headerRow.innerHTML = '<th class="px-4 py-3 text-center font-semibold text-slate-700 border-b" colspan="10">No EON data processed yet</th>';
+                tbody.innerHTML = '<tr><td class="px-4 py-6 text-center text-slate-400 italic">Process EON data to see filtered output</td></tr>';
+                return;
+            }
+
+            // Render header
+            const headers = rows[0];
+            headerRow.innerHTML = '';
+            headers.forEach(h => {
+                const th = document.createElement('th');
+                th.className = 'px-3 py-2 text-left font-semibold text-slate-700 border-b text-xs';
+                th.textContent = h || '';
+                headerRow.appendChild(th);
+            });
+
+            // Render data rows
+            tbody.innerHTML = '';
+            
+            // Find SETTRATE, CURRCODE, and FCY NAME column indices from headers
+            const headerCells = headers.map(h => norm(h));
+            const settRateIdx = headerCells.indexOf('SETTRATE');
+            const currCodeIdx = headerCells.indexOf('CURRCODE');
+            const fcyNameIdx = headerCells.indexOf('FCYNAME');
+            
+            console.log("Display table - SettRate column:", settRateIdx, "CurrCode column:", currCodeIdx, "FcyName column:", fcyNameIdx);
+            
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i];
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-slate-100 hover:bg-slate-50';
+                
+                // Get the currency code for this row - try both CURRCODE and FCY NAME
+                let rowCurrCode = '';
+                if (currCodeIdx !== -1) {
+                    rowCurrCode = (row[currCodeIdx] || '').trim().toUpperCase();
+                    rowCurrCode = rowCurrCode.split('/')[0].substring(0, 3);
+                }
+                
+                // If no CURRCODE or not found in rates, try FCY NAME
+                if ((!rowCurrCode || !currencyRates[rowCurrCode]) && fcyNameIdx !== -1) {
+                    rowCurrCode = (row[fcyNameIdx] || '').trim().toUpperCase();
+                    rowCurrCode = rowCurrCode.split('/')[0].substring(0, 3);
+                }
+                
+                row.forEach((cell, cellIdx) => {
+                    const td = document.createElement('td');
+                    td.className = 'px-3 py-2 text-slate-700 text-xs';
+                    
+                    // If this is the SETTRATE column, replace with AVG RATE from currencyRates
+                    if (cellIdx === settRateIdx && rowCurrCode && currencyRates[rowCurrCode]) {
+                        td.textContent = currencyRates[rowCurrCode].toFixed(4);
+                        console.log(`Row ${i}: Displaying ${rowCurrCode} rate as ${currencyRates[rowCurrCode].toFixed(4)}`);
+                    } else {
+                        td.textContent = cell || '';
+                    }
+                    
+                    tr.appendChild(td);
+                });
+                
+                tbody.appendChild(tr);
+            }
+        }
+
+        // Display Unmatched output in table
+        function displayUnmatchedOutput(rows) {
+            const headerRow = document.getElementById('unmatchedOutputHeader');
+            const tbody = document.getElementById('unmatchedOutputTableBody');
+            
+            if (rows.length < 2) {
+                headerRow.innerHTML = '<th class="px-4 py-3 text-center font-semibold text-slate-700 border-b" colspan="10">No unmatched data</th>';
+                tbody.innerHTML = '<tr><td class="px-4 py-6 text-center text-slate-400 italic">All rows matched successfully</td></tr>';
+                return;
+            }
+
+            // Render header
+            const headers = rows[0];
+            headerRow.innerHTML = '';
+            headers.forEach(h => {
+                const th = document.createElement('th');
+                th.className = 'px-3 py-2 text-left font-semibold text-red-700 border-b text-xs';
+                th.textContent = h || '';
+                headerRow.appendChild(th);
+            });
+
+            // Render data rows
+            tbody.innerHTML = '';
+            
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i];
+                const tr = document.createElement('tr');
+                tr.className = 'border-b border-red-50 hover:bg-red-50';
+                
+                row.forEach((cell, cellIdx) => {
+                    const td = document.createElement('td');
+                    td.className = 'px-3 py-2 text-red-700 text-xs';
+                    td.textContent = cell || '';
+                    tr.appendChild(td);
+                });
+                
+                tbody.appendChild(tr);
+            }
+        }
+
+        // Copy EON Output
+        function copyEonOutput() {
+            const eonText = document.getElementById('eonData').value.trim();
+            
+            if (!eonText) {
+                showStatus("No EON data to copy", "error");
+                return;
+            }
+            
+            // Copy to clipboard
+            navigator.clipboard.writeText(eonText).then(() => {
+                showStatus("EON data copied to clipboard!", "success");
+            }).catch(() => {
+                showStatus("Failed to copy. Please try again.", "error");
+            });
+        }
+
+        // Copy Unmatched Report
+        function copyUnmatchedReport() {
+            const headerRow = document.getElementById('unmatchedOutputHeader');
+            const tbody = document.getElementById('unmatchedOutputTableBody');
+            
+            // Check if there's actual data
+            const firstCell = tbody.querySelector('td');
+            if (!firstCell || firstCell.textContent.includes('All rows matched') || firstCell.textContent.includes('Process EON')) {
+                showStatus("No unmatched data to copy", "error");
+                return;
+            }
+            
+            // Get headers
+            const headers = [];
+            headerRow.querySelectorAll('th').forEach(th => {
+                headers.push(th.textContent.trim());
+            });
+            
+            // Get data rows
+            const dataRows = [];
+            tbody.querySelectorAll('tr').forEach(tr => {
+                const cells = [];
+                tr.querySelectorAll('td').forEach(td => {
+                    cells.push(td.textContent.trim());
+                });
+                if (cells.length > 0) {
+                    dataRows.push(cells.join('\t'));
+                }
+            });
+            
+            const textToCopy = headers.join('\t') + '\n' + dataRows.join('\n');
+            
+            // Copy to clipboard
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                showStatus("Unmatched data copied to clipboard!", "success");
+            }).catch(() => {
+                showStatus("Failed to copy. Please try again.", "error");
+            });
+        }
+
+        // Copy Client References
+        function copyClientReferences() {
+            const tbody = document.getElementById('clientRefTableBody');
+            const rows = tbody.querySelectorAll('tr');
+            
+            let textToCopy = '';
+            rows.forEach(row => {
+                const cell = row.querySelector('td');
+                const text = cell.textContent.trim();
+                // Skip empty rows and placeholder text
+                if (text && !text.includes('No data') && !text.includes('No client')) {
+                    textToCopy += text + '\n';
+                }
+            });
+            
+            if (!textToCopy) {
+                showStatus("No client references to copy", "error");
+                return;
+            }
+            
+            // Copy to clipboard
+            navigator.clipboard.writeText(textToCopy.trim()).then(() => {
+                showStatus("Client references copied to clipboard!", "success");
+            }).catch(() => {
+                showStatus("Failed to copy. Please try again.", "error");
+            });
+        }
+
+        // Clear all data
+        function clearAll() {
+            document.getElementById('bankData').value = '';
+            document.getElementById('eonData').value = '';
+            document.getElementById('resultTableBody').innerHTML = '<tr><td colspan="4" class="px-4 py-6 text-center text-slate-400 italic">No data processed yet</td></tr>';
+            document.getElementById('clientRefTableBody').innerHTML = '<tr><td class="px-4 py-6 text-center text-slate-400 italic">No data processed yet</td></tr>';
+            document.getElementById('unmatchedOutputHeader').innerHTML = '<th class="px-4 py-3 text-center font-semibold text-slate-700 border-b" colspan="10">No unmatched data yet</th>';
+            document.getElementById('unmatchedOutputTableBody').innerHTML = '<tr><td class="px-4 py-6 text-center text-slate-400 italic">Process EON data to see unmatched rows</td></tr>';
+            document.getElementById('eonOutputHeader').innerHTML = '<th class="px-4 py-3 text-center font-semibold text-slate-700 border-b" colspan="10">No EON data processed yet</th>';
+            document.getElementById('eonOutputTableBody').innerHTML = '<tr><td class="px-4 py-6 text-center text-slate-400 italic">Process EON data to see filtered output</td></tr>';
+            document.getElementById('rightInr').innerText = '0.00';
+            document.getElementById('rightBc').innerText = '0.00';
+            document.getElementById('rightTotal').innerText = '0.00';
+            document.getElementById('rightDelcan').innerText = '0.00';
+            document.getElementById('rightEon').innerText = '0.00';
+            document.getElementById('rightDiff').innerText = '0.00';
+            document.getElementById('rightDiff').className = 'px-3 py-2 text-right font-mono font-bold text-sm';
+            document.getElementById('bankSection').classList.add('hidden');
+            document.getElementById('eonSection').classList.add('hidden');
+            showStatus("All data cleared", "success");
+        }
+    </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9c801fd593397f74',t:'MTc3MDEwMjc5Mi4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
